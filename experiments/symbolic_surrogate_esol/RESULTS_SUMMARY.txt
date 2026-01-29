@@ -1,0 +1,18 @@
+Experiment Summary: ESOL Symbolic Regression
+
+Random Forest Test MSE:
+0.66
+
+Symbolic Surrogate (fit on RF predictions):
+Equation: (x119 + x356 + x561) * -0.299
+Surrogate Fidelity MSE: 0.29
+
+Direct Symbolic Regression (fit on labels):
+Equation: x561 * -0.3808
+Direct Symbolic Test MSE: 1.22
+
+Important Features Identified:
+x119, x356, x561
+
+Stability Across Seeds:
+x561 * constant consistently discovered
