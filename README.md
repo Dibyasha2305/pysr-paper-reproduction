@@ -8,7 +8,7 @@ Extensions exploring symbolic regression for interpretability of machine learnin
 
 The goal is to study how symbolic regression can recover known equations, discover interpretable structure in real datasets, and act as an interpretable surrogate for black-box models.
 
-Part 1 — PySR Paper Reproduction
+Part 1 : PySR Paper Reproduction
 Benchmark Functions
 
 Exact or near-exact symbolic recovery was achieved for standard Nguyen benchmarks:
@@ -33,7 +33,7 @@ Symbolic expressions recover meaningful structure even when exact recovery is di
 
 These experiments demonstrate PySR’s ability to balance accuracy and symbolic simplicity.
 
-Part 2 — Symbolic Surrogate Models for DeepChem (ESOL)
+Part 2 : Symbolic Surrogate Models for DeepChem (ESOL)
 
 We explore whether symbolic regression can explain machine learning models trained on molecular data.
 
