@@ -1,9 +1,9 @@
 # step2_train_rf.py
-
 import numpy as np
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_squared_error
 import joblib
+
 
 print("Loading saved data")
 
@@ -31,5 +31,4 @@ np.save("rf_test_preds.npy", preds)
 
 print("STEP 2 COMPLETE")
 
-import joblib
 joblib.dump(rf, "rf_model.pkl")

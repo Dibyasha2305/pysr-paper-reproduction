@@ -16,7 +16,7 @@ model = PySRRegressor(
     unary_operators=["sin", "cos"],
     complexity_of_constants=2,
     parsimony=1e-3,
-    verbosity=1
+    verbosity=1,
 )
 
 model.fit(x, y)

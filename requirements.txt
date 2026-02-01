@@ -1,0 +1,7 @@
+numpy
+deepchem
+pytest
+pysr
+scikit-learn
+sympy
+joblib

@@ -17,9 +17,7 @@ y = (
     + 5 * X[:, 4]
 )
 
-X_train, X_test, y_train, y_test = train_test_split(
-    X, y, test_size=0.2, random_state=0
-)
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=0)
 
 # PySR model (paper-style)
 model = PySRRegressor(
@@ -29,7 +27,7 @@ model = PySRRegressor(
     unary_operators=["sin"],
     complexity_of_constants=2,
     parsimony=1e-3,
-    verbosity=0
+    verbosity=0,
 )
 
 

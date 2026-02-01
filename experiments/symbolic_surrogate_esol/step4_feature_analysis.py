@@ -4,9 +4,7 @@ import numpy as np
 print("Loading ESOL dataset with same featurizer...")
 
 tasks, datasets, _ = dc.molnet.load_delaney(
-    featurizer="ECFP",
-    splitter="random",
-    seed=42
+    featurizer="ECFP", splitter="random", seed=42
 )
 
 train_dataset, _, _ = datasets

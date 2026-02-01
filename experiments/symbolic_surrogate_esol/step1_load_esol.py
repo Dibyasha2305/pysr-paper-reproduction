@@ -13,10 +13,12 @@ tasks, datasets, transformers = dc.molnet.load_delaney()
 
 train_dataset, valid_dataset, test_dataset = datasets
 
+
 def to_numpy(dataset):
     X = np.array(dataset.X)
     y = dataset.y.reshape(-1)
     return X, y
+
 
 X_train, y_train = to_numpy(train_dataset)
 X_valid, y_valid = to_numpy(valid_dataset)

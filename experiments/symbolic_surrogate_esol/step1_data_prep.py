@@ -11,18 +11,19 @@ print("Loading ESOL dataset...")
 
 # Load ESOL dataset
 tasks, datasets, transformers = dc.molnet.load_delaney(
-
     featurizer=dc.feat.MolGraphConvFeaturizer(use_edges=True),
     splitter="random",
-    seed=SEED
+    seed=SEED,
 )
 
 train_dataset, valid_dataset, test_dataset = datasets
+
 
 def dc_to_numpy(dataset):
     X = np.array([x.to_numpy() for x in dataset.X])
     y = dataset.y.reshape(-1)
     return X, y
+
 
 # Convert to numpy
 X_train, y_train = dc_to_numpy(train_dataset)
