@@ -294,27 +294,5 @@ Documentation improvements
 
 
 
-&nbsp;License
 
-MIT License
-
-
-
-
-
----
-
-
-
-\##  Next Step
-
-
-
-After pasting:
-
-
-
-```bash
-
-git status
 
