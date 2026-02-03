@@ -1,5 +1,6 @@
 import torch
-from torch_symbolic_net import SymbolicNet, train_symbolic_model
+from models.torch_symbolic_net import SymbolicNet, train_symbolic_model
+
 
 
 def test_symbolic_net_learns_linear_equation():

@@ -1,7 +1,8 @@
 import numpy as np
 import deepchem as dc
 
-from dc_torch_symbolic_regressor import DCTorchSymbolicRegressor
+from models.dc_torch_symbolic_regressor import DCTorchSymbolicRegressor
+
 
 
 def test_dc_torch_symbolic_regressor():

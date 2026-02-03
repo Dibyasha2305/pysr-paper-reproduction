@@ -21,52 +21,25 @@ import torch
 import torch.nn as nn
 
 
-class SymbolicNet(nn.Module):
+class SymbolicNet(torch.nn.Module):
     """
-    Simple symbolic regression network.
+    Multivariate linear symbolic network:
 
-    Learns equation:
-
-        y = a * x + b
-
-    Attributes
-    ----------
-    linear : nn.Linear
-        Linear layer with 1 input and 1 output.
+        y = w1*x1 + w2*x2 + ... + wn*xn + b
     """
 
-    def __init__(self) -> None:
+    def __init__(self, n_features: int):
         super().__init__()
-        self.linear: nn.Linear = nn.Linear(1, 1)
+        self.linear = torch.nn.Linear(n_features, 1)
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """
-        Forward pass.
-
-        Parameters
-        ----------
-        x : torch.Tensor
-            Input tensor of shape (n_samples, 1).
-
-        Returns
-        -------
-        torch.Tensor
-            Output tensor of shape (n_samples, 1).
-        """
+    def forward(self, x):
         return self.linear(x)
 
-    def get_equation(self) -> Tuple[float, float]:
-        """
-        Return learned symbolic equation parameters.
+    def get_equation(self):
+        weights = self.linear.weight.detach().numpy().flatten()
+        bias = self.linear.bias.item()
 
-        Returns
-        -------
-        tuple of float
-            (a, b) where equation is y = a * x + b
-        """
-        a = self.linear.weight.item()
-        b = self.linear.bias.item()
-        return a, b
+        return weights, bias
 
 
 def train_symbolic_model(

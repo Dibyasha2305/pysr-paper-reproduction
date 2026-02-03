@@ -60,6 +60,15 @@ y = a \* x + b
 
 where `a` and `b` are learned parameters.
 
+# Example Results
+
+# Prediction vs Ground Truth
+
+![Prediction vs Ground Truth](outputs/pred_vs_true.png)
+
+### Training Loss Curve
+
+![Training Loss](outputs/loss_curve.png)
 
 
 Architecture:
