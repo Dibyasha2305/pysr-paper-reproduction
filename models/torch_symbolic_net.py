@@ -1,90 +1,45 @@
-"""
-PyTorch symbolic regression network.
-
-Implements a simple linear symbolic model:
-
-    y = a * x + b
-
-Examples
---------
->>> import torch
->>> from torch_symbolic_net import SymbolicNet, train_symbolic_model
->>> model = SymbolicNet()
->>> X = torch.randn(100, 1)
->>> y = 3.0 * X + 0.5
->>> train_symbolic_model(model, X, y)
->>> model.get_equation()
-"""
-
-from typing import Tuple
 import torch
 import torch.nn as nn
 
 
-class SymbolicNet(torch.nn.Module):
+class SymbolicNet(nn.Module):
     """
-    Multivariate linear symbolic network:
+    Symbolic regression network with polynomial feature expansion.
 
-        y = w1*x1 + w2*x2 + ... + wn*xn + b
+    φ(x) = [x, x^2, x^3]
     """
 
     def __init__(self, n_features: int):
         super().__init__()
-        self.linear = torch.nn.Linear(n_features, 1)
+
+        self.n_features = n_features
+        self.expanded_features = 3 * n_features
+
+        self.linear = nn.Linear(self.expanded_features, 1)
+
+    def expand_features(self, x):
+        """
+        Polynomial feature expansion.
+        """
+        x1 = x
+        x2 = x ** 2
+        x3 = x ** 3
+        return torch.cat([x1, x2, x3], dim=1)
 
     def forward(self, x):
-        return self.linear(x)
+        x_expanded = self.expand_features(x)
+        return self.linear(x_expanded)
 
     def get_equation(self):
-        weights = self.linear.weight.detach().numpy().flatten()
-        bias = self.linear.bias.item()
+        """
+        Return weights grouped by polynomial order.
+        """
+        W = self.linear.weight.detach().cpu().numpy().flatten()
+        b = self.linear.bias.item()
 
-        return weights, bias
+        w_x = W[:self.n_features]
+        w_x2 = W[self.n_features:2 * self.n_features]
+        w_x3 = W[2 * self.n_features:3 * self.n_features]
 
-
-def train_symbolic_model(
-    model: SymbolicNet,
-    X: torch.Tensor,
-    y: torch.Tensor,
-    epochs: int = 500,
-    lr: float = 0.05
-) -> None:
-    """
-    Train symbolic regression model.
-
-    Parameters
-    ----------
-    model : SymbolicNet
-        Model to train.
-    X : torch.Tensor
-        Input tensor of shape (n_samples, 1).
-    y : torch.Tensor
-        Target tensor of shape (n_samples, 1).
-    epochs : int
-        Number of training epochs.
-    lr : float
-        Learning rate.
-    """
-    loss_fn = nn.MSELoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
-
-    for _ in range(epochs):
-        preds = model(X)
-        loss = loss_fn(preds, y)
-
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
-
-
-if __name__ == "__main__":
-    model = SymbolicNet()
-
-    X = torch.randn(100, 1)
-    y = 3.0 * X + 0.5
-
-    train_symbolic_model(model, X, y)
-
-    a, b = model.get_equation()
-    print(f"Learned equation: y = {a:.3f} * x + {b:.3f}")
+        return w_x, w_x2, w_x3, b
 
