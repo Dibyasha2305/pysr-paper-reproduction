@@ -1,12 +1,6 @@
-"""
-DeepChem TorchModel wrapper for multivariate SymbolicNet
-with polynomial (x, x^2, x^3) expansions.
-"""
-
-from typing import Dict
-import numpy as np
 import torch
 import deepchem as dc
+import numpy as np
 
 from deepchem.models.torch_models.torch_model import TorchModel
 from deepchem.models.losses import L2Loss
@@ -17,67 +11,72 @@ from models.torch_symbolic_net import SymbolicNet
 
 class DCTorchSymbolicRegressor(TorchModel):
     """
-    DeepChem TorchModel wrapper for SymbolicNet.
+    Stable symbolic regressor for molecular benchmarks.
 
-    Learns symbolic equation:
-
-        y = sum_i (a_i x_i + b_i x_i^2 + c_i x_i^3) + d
+    y = w1*x + w2*x^2 + w3*x^3 + b
     """
 
-    def __init__(
-        self,
-        learning_rate: float = 0.01,
-        batch_size: int = 256
-    ) -> None:
-
-        # Dummy model (DeepChem requires model at init)
+    def __init__(self, learning_rate=0.0003, batch_size=256):
         dummy = torch.nn.Linear(1, 1)
 
         super().__init__(
             model=dummy,
             loss=L2Loss(),
-            optimizer=Adam(),
-            learning_rate=learning_rate,
+            optimizer=Adam(
+                learning_rate=learning_rate,
+                weight_decay=1e-3   # 🔴 stronger regularization
+            ),
             batch_size=batch_size,
             output_types=["prediction"]
         )
 
+        self.learning_rate = learning_rate
+
+    # ----------------------------
+    # build symbolic net
+    # ----------------------------
     def build(self, dataset):
-        """
-        Build real symbolic model once feature dimension is known.
-        """
         n_features = dataset.X.shape[1]
 
-        # Replace dummy with real symbolic model
         self.model = SymbolicNet(n_features)
 
-        # Reset DeepChem internals
+        # rebuild optimizer
         self._built = False
         self._ensure_built()
 
+    # ----------------------------
+    # stable fit with clipping
+    # ----------------------------
     def fit(self, dataset, **kwargs):
-        """
-        Fit symbolic model.
-        """
         self.build(dataset)
+
+        # enable gradient clipping
+        for p in self.model.parameters():
+            p.register_hook(
+                lambda grad: torch.clamp(grad, -5.0, 5.0)
+            )
+
         return super().fit(dataset, **kwargs)
 
-    def get_equation(self) -> Dict[str, np.ndarray]:
-        """
-        Return learned symbolic equation components.
+    # ----------------------------
+    # equation extraction
+    # ----------------------------
+    def get_equation(self):
+        eq = self.model.get_equation()
 
-        Returns
-        -------
-        dict with keys:
-            linear, quadratic, cubic, bias
-        """
-        w_x, w_x2, w_x3, b = self.model.get_equation()
+        if isinstance(eq, tuple):
+            w, b = eq
+            return {
+                "linear": w,
+                "quadratic": np.zeros_like(w),
+                "cubic": np.zeros_like(w),
+                "bias": b,
+            }
 
-        return {
-            "linear": np.array(w_x),
-            "quadratic": np.array(w_x2),
-            "cubic": np.array(w_x3),
-            "bias": b
-        }
+        eq.setdefault("linear", None)
+        eq.setdefault("quadratic", None)
+        eq.setdefault("cubic", None)
+        eq.setdefault("bias", 0.0)
 
+        return eq
 

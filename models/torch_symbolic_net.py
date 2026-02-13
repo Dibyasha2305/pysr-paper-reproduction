@@ -4,42 +4,34 @@ import torch.nn as nn
 
 class SymbolicNet(nn.Module):
     """
-    Symbolic regression network with polynomial feature expansion.
+    Linear + quadratic symbolic regression model.
 
-    φ(x) = [x, x^2, x^3]
+    y = w1*x + w2*x^2 + b
     """
 
     def __init__(self, n_features: int):
         super().__init__()
 
         self.n_features = n_features
-        self.expanded_features = 3 * n_features
 
-        self.linear = nn.Linear(self.expanded_features, 1)
+        # Linear weights
+        self.linear = nn.Linear(n_features, 1, bias=False)
 
-    def expand_features(self, x):
-        """
-        Polynomial feature expansion.
-        """
-        x1 = x
-        x2 = x ** 2
-        x3 = x ** 3
-        return torch.cat([x1, x2, x3], dim=1)
+        # Quadratic weights
+        self.quadratic = nn.Linear(n_features, 1, bias=False)
+
+        # Bias
+        self.bias = nn.Parameter(torch.zeros(1))
 
     def forward(self, x):
-        x_expanded = self.expand_features(x)
-        return self.linear(x_expanded)
+        linear_part = self.linear(x)
+        quad_part = self.quadratic(x ** 2)
+        return linear_part + quad_part + self.bias
 
     def get_equation(self):
-        """
-        Return weights grouped by polynomial order.
-        """
-        W = self.linear.weight.detach().cpu().numpy().flatten()
-        b = self.linear.bias.item()
-
-        w_x = W[:self.n_features]
-        w_x2 = W[self.n_features:2 * self.n_features]
-        w_x3 = W[2 * self.n_features:3 * self.n_features]
-
-        return w_x, w_x2, w_x3, b
+        return {
+            "linear": self.linear.weight.detach().cpu().numpy().flatten(),
+            "quadratic": self.quadratic.weight.detach().cpu().numpy().flatten(),
+            "bias": self.bias.item()
+        }
 
