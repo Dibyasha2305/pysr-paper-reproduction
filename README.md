@@ -1,307 +1,212 @@
-\# DeepChem-Compatible PyTorch Symbolic Regression
+_**DeepChem-Compatible Symbolic Models for MoleculeNet**_
 
+This repository implements symbolic regression and classification models in PyTorch, integrated with DeepChem’s TorchModel API and evaluated on MoleculeNet benchmarks using scaffold splits.
 
+The goal is to explore whether interpretable symbolic models can approach the performance of standard machine learning baselines (Random Forest) on molecular property prediction tasks while producing explicit mathematical formulas.
 
-This repository contains a minimal yet extensible \*\*symbolic regression prototype\*\* implemented in PyTorch and wrapped as a DeepChem `TorchModel`.
 
+_**Motivation**_
 
 
-The goal of this project is to explore how \*\*symbolic-style models\*\* (which discover explicit mathematical expressions) can be integrated into DeepChem’s PyTorch backend in a clean, testable, and extensible manner.
+DeepChem is transitioning toward PyTorch as its primary deep learning backend.
+While neural architectures are well supported, symbolic / equation-based models remain largely external.
 
+Symbolic models are valuable in chemistry because they:
+- produce interpretable structure–property relationships
+- reveal descriptor contributions
+- enable scientific insight beyond black-box prediction
 
+This project demonstrates how symbolic models can be:
+- implemented in PyTorch
+- wrapped as DeepChem TorchModel
+- trained on MoleculeNet datasets
+- evaluated against ML baselines
+- used to recover human-readable formulas
 
----
 
+_**Symbolic Model**_
 
+The symbolic model learns an explicit nonlinear function over molecular descriptors:
 
-\## Motivation
+logit(y) = b + Σ wi·xi + Σ qi·xi²
 
+where:
+xi = RDKit molecular descriptor
+wi = linear coefficient
+qi = quadratic coefficient
+b = bias
 
+For regression tasks:
 
-DeepChem is actively transitioning from TensorFlow to PyTorch as its primary deep learning backend.  
+y = b + Σ wi·xi + Σ qi·xi²
 
-While DeepChem supports many neural architectures, symbolic regression models remain largely external to the framework.
+For classification:
 
+p = sigmoid(logit)
 
 
-This project demonstrates:
+_**DeepChem Integration**_
 
+The model is implemented as:
 
+_torch_symbolic_net.py_ → PyTorch symbolic network
 
-\- How a symbolic regression model can be written as a PyTorch `nn.Module`
+_dc_torch_symbolic_regressor.py_ → DeepChem TorchModel wrapper
 
-\- How it can be wrapped as a DeepChem `TorchModel`
+_dc_torch_symbolic_classifier.py _→ logistic symbolic model
 
-\- How such a model can participate in DeepChem’s training, prediction, and evaluation pipelines
 
+This allows symbolic models to use:
+- DeepChem datasets
+- scaffold splitting
+- NumpyDataset pipelines
+- training loops
+- evaluation metrics
 
 
-This serves as a foundation for more expressive symbolic regression approaches (nonlinear basis functions, operator libraries, expression trees, hybrid evolutionary + gradient methods).
+_**MoleculeNet Regression Benchmarks**_
 
+Datasets:
 
+- ESOL (solubility)
+- FreeSolv (hydration free energy)
+- Lipophilicity (logD)
 
----
+All experiments use:
 
+- RDKit descriptors
+- RandomForest feature selection
+- quadratic expansion
+- standardization
+- scaffold split
 
+**Results (RMSE)**
 
-\## Model Overview
+| Dataset       | RF    | Symbolic | Gap    |
+| ------------- | ----- | -------- | ------ |
+| ESOL          | 0.317 | 0.324    | +0.007 |
+| FreeSolv      | 0.240 | 0.230    | −0.010 |
+| Lipophilicity | 0.546 | 0.427    | −0.119 |
 
+Symbolic regression matches or exceeds RF on FreeSolv and Lipophilicity and is nearly identical on ESOL.
 
 
-Current prototype learns a simple symbolic form:
+_**MoleculeNet Classification Benchmarks**_
 
+Datasets:
 
+- BBBP (blood–brain barrier)
+- BACE (binding affinity)
 
-y = a \* x + b
+Model:
 
+- symbolic logistic regression
+- RDKit descriptors
+- quadratic expansion
+- scaffold split
 
+Results (AUC)
+| Dataset | RF    | Symbolic |
+| ------- | ----- | -------- |
+| BBBP    | 0.747 | 0.674    |
+| BACE    | 0.796 | 0.702    |
 
+Symbolic classifiers are reasonably close to RF, especially on BACE.
 
 
-where `a` and `b` are learned parameters.
 
-# Example Results
+_**Recovered Symbolic Formulas**_
 
-# Prediction vs Ground Truth
+Example recovered symbolic classifiers:
 
-![Prediction vs Ground Truth](outputs/pred_vs_true.png)
+**BBBP**
+logit(BBBP) =
+ 0.68
+ + 0.08·SlogP_VSA9
+ + 0.06·SlogP_VSA1
+ − 0.05·PEOE_VSA8
+ + 0.19·fr_urea
+ + 0.14·NumAmideBonds
+ + 0.07·NumSaturatedHeterocycles²
+ + 0.07·NumHeteroatoms²
+ + 0.06·SlogP_VSA8²
 
-### Training Loss Curve
+**BACE**
+logit(BACE) =
+ 0.33
+ + 0.13·PEOE_VSA1
+ + 0.11·PEOE_VSA11
+ − 0.16·MolWt
+ + 0.10·NumSaturatedCarbocycles
+ + 0.09·MaxEStateIndex
+ − 0.15·PEOE_VSA2²
+ + 0.60·MaxEStateIndex²
 
-![Training Loss](outputs/loss_curve.png)
+These formulas show interpretable descriptor contributions with linear and nonlinear structure.
 
 
-Architecture:
-
-
-
-Input x
-
-│
-
-▼
-
-Linear Layer (1 → 1)
-
-│
-
-▼
-
-Output y
-
-
-
-
-
-Although simple, this structure validates the full DeepChem–PyTorch integration path.
-
-
-
----
-
-
-
-\## Project Structure
-
-
+_**Repository Structure**_
 
 src/
-
 │
-
-├── torch\_symbolic\_net.py
-
-│ PyTorch nn.Module implementing symbolic model
-
+├── models/
+│   ├── torch_symbolic_net.py
+│   ├── dc_torch_symbolic_regressor.py
+│   └── dc_torch_symbolic_classifier.py
 │
-
-├── dc\_torch\_symbolic\_regressor.py
-
-│ DeepChem TorchModel wrapper
-
+├── experiments/
+│   ├── molnet_symbolic_benchmark.py
+│   └── molnet_symbolic_classification.py
 │
+└── outputs/
+    ├── *_pred.png
+    ├── *_roc.png
+    ├── molnet_equations.txt
+    └── molnet_classification_equations.txt
 
-├── test\_torch\_symbolic\_net.py
 
-│ Unit tests for PyTorch model
+_**Installation**_
 
-│
+conda create -n sr_env python=3.10
+conda activate sr_env
+pip install torch deepchem scikit-learn matplotlib
 
-├── test\_dc\_torch\_symbolic.py
 
-│ Unit tests for DeepChem wrapper
+_**Running Benchmarks**_
 
-│
+**Regression:**
+python experiments/molnet_symbolic_benchmark.py
 
-├── torch\_playground.py
+**Classification:**
+python experiments/molnet_symbolic_classification.py
 
-│ Learning playground for PyTorch basics
+**Outputs are saved in:**
+outputs/
 
-│
 
-└── test\_torch\_playground.py
+_**Key Contributions**_
 
-Tests for playground example
+This project shows that:
 
+- symbolic models integrate cleanly with DeepChem TorchModel
+- interpretable formulas can approach RF performance
+- nonlinear descriptor terms improve accuracy
+- scaffold-split MoleculeNet benchmarks are feasible
+- symbolic classifiers achieve competitive AUC
 
 
+_**Future Directions**_
 
+- richer operator libraries (exp, log, interactions)
+- sparse symbolic selection
+- hybrid symbolic-neural models
+- uncertainty estimation
+- larger MoleculeNet tasks
+- integration into DeepChem core
 
----
 
+**Status**
 
+Draft research prototype for DeepChem symbolic modeling.
 
-\## Installation
-
-
-
-Create and activate environment:
-
-
-
-```bash
-
-conda create -n sr\_env python=3.10
-
-conda activate sr\_env
-
-Install dependencies:
-
-
-
-pip install torch deepchem pytest
-
-Running Tests
-
-Run all tests:
-
-
-
-pytest
-
-Run only symbolic regression tests:
-
-
-
-pytest test\_torch\_symbolic\_net.py
-
-pytest test\_dc\_torch\_symbolic.py
-
-Quick Usage Example
-
-import numpy as np
-
-import deepchem as dc
-
-from dc\_torch\_symbolic\_regressor import DCTorchSymbolicRegressor
-
-
-
-\# Generate data
-
-X = np.random.randn(200, 1)
-
-y = 3.0 \* X + 0.5
-
-
-
-dataset = dc.data.NumpyDataset(X, y)
-
-
-
-\# Create model
-
-model = DCTorchSymbolicRegressor(learning\_rate=0.01, batch\_size=200)
-
-
-
-\# Train
-
-model.fit(dataset, nb\_epoch=2000)
-
-
-
-\# Extract equation
-
-a, b = model.get\_equation()
-
-print(f"Learned equation: y = {a:.3f} \* x + {b:.3f}")
-
-Features
-
-PyTorch-based symbolic model
-
-
-
-DeepChem TorchModel integration
-
-
-
-NumPyDoc-style docstrings
-
-
-
-Type annotations
-
-
-
-Unit tests
-
-
-
-Reproducible training
-
-
-
-Roadmap
-
-Planned extensions:
-
-
-
-Multi-feature regression:
-
-y = a1\*x1 + a2\*x2 + ... + b
-
-
-
-Nonlinear basis functions (x², sin(x), exp(x), etc.)
-
-
-
-Operator library and expression search
-
-
-
-Hybrid gradient + evolutionary optimization
-
-
-
-Benchmarking against PySR
-
-
-
-
-
-Suggested areas:
-
-
-
-New symbolic model architectures
-
-
-
-Better optimization strategies
-
-
-
-Additional tests
-
-
-
-Documentation improvements
-
-
-
-
-
+Prepared as part of symbolic modeling exploration under DeepChem PyTorch transition.
