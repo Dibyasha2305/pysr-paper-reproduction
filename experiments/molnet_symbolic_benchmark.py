@@ -25,16 +25,17 @@ from models.dc_torch_symbolic_regressor import DCTorchSymbolicRegressor
 def load_esol():
     _, ds, _ = dc.molnet.load_delaney(
         featurizer=dc.feat.RDKitDescriptors(),
-        splitter="random",
+        splitter="scaffold",
         reload=False
     )
     return ds
 
 
+
 def load_freesolv():
     _, ds, _ = dc.molnet.load_freesolv(
         featurizer=dc.feat.RDKitDescriptors(),
-        splitter="random",
+        splitter="scaffold",
         reload=False
     )
     return ds
@@ -43,10 +44,11 @@ def load_freesolv():
 def load_lipo():
     _, ds, _ = dc.molnet.load_lipo(
         featurizer=dc.feat.RDKitDescriptors(),
-        splitter="random",
+        splitter="scaffold",
         reload=False
     )
     return ds
+
 
 
 # --------------------------------------------------
@@ -56,11 +58,11 @@ def load_lipo():
 def train_rf(train, test, dataset_name):
 
     if dataset_name == "ESOL":
-        top_k = 30
+        top_k = 12
     elif dataset_name == "FreeSolv":
-        top_k = 15
+        top_k = 8
     else:
-        top_k = 10
+        top_k = 6
 
     X_train = train.X
     y_train = train.y.flatten()
@@ -79,13 +81,24 @@ def train_rf(train, test, dataset_name):
 
     return rf, rmse, idx, X_train_sel, X_test_sel
 
-
-# --------------------------------------------------
-# Polynomial expansion
-# --------------------------------------------------
-
 def expand(X):
-    return np.concatenate([X, X**2, X**3], axis=1)
+    X = np.asarray(X)
+    X2 = X ** 2
+    n = X.shape[1]
+
+    pairs = []
+    for i in range(n):
+        for j in range(i + 1, n):
+            pairs.append((X[:, i] * X[:, j])[:, None])
+
+    X_pair = np.hstack(pairs) if pairs else None
+    X_sqrt = np.sqrt(np.abs(X) + 1e-8)
+
+    parts = [X, X2, X_sqrt]
+    if X_pair is not None:
+        parts.append(X_pair)
+
+    return np.concatenate(parts, axis=1)
 
 
 # --------------------------------------------------
@@ -117,10 +130,21 @@ def save_prediction_plot(name, rf_preds, sym_preds):
 
 def train_symbolic(name, rf, idx, X_train_sel, X_test_sel, train, test):
 
+    # dataset-specific cubic strength
+    if name == "ESOL":
+        cubic_k = 10
+    elif name == "FreeSolv":
+        cubic_k = 3
+    else:  # Lipophilicity
+        cubic_k = 8
+
     X_train = expand(X_train_sel)
     X_test = expand(X_test_sel)
 
-    scaler = StandardScaler()
+
+
+    scaler = StandardScaler(with_mean=True, with_std=True)
+
     X_train = scaler.fit_transform(X_train)
     X_test = scaler.transform(X_test)
 
