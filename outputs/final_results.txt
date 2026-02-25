@@ -1,5 +1,0 @@
-FINAL RESULTS 
-
-ESOL: RF 0.317 | Symbolic 0.324
-FreeSolv: RF 0.240 | Symbolic 0.230
-Lipophilicity: RF 0.546 | Symbolic 0.427
