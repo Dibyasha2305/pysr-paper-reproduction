@@ -45,3 +45,13 @@ bias: 0.6798
 linear: 0.1004
 quadratic: 0.1142
 bias: 0.3315
+
+----- BBBP -----
+linear: 0.5296
+quadratic: 0.3933
+bias: 1.3577
+
+----- BACE -----
+linear: 0.2039
+quadratic: 0.4403
+bias: 0.1956

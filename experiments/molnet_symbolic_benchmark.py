@@ -15,11 +15,11 @@ from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_squared_error
 from sklearn.preprocessing import StandardScaler
 
-from models.dc_torch_symbolic_regressor import DCTorchSymbolicRegressor
+from models.dc_torch_symbolic_model import DCTorchSymbolicModel
 
 
 # --------------------------------------------------
-# Loaders
+# Loaders (scaffold)
 # --------------------------------------------------
 
 def load_esol():
@@ -29,7 +29,6 @@ def load_esol():
         reload=False
     )
     return ds
-
 
 
 def load_freesolv():
@@ -50,7 +49,6 @@ def load_lipo():
     return ds
 
 
-
 # --------------------------------------------------
 # RF + feature selection
 # --------------------------------------------------
@@ -64,16 +62,13 @@ def train_rf(train, test, dataset_name):
     else:
         top_k = 6
 
-    X_train = train.X
-    y_train = train.y.flatten()
-
     rf = RandomForestRegressor(n_estimators=300, random_state=0)
-    rf.fit(X_train, y_train)
+    rf.fit(train.X, train.y.flatten())
 
     importances = rf.feature_importances_
     idx = np.argsort(importances)[::-1][:top_k]
 
-    X_train_sel = X_train[:, idx]
+    X_train_sel = train.X[:, idx]
     X_test_sel = test.X[:, idx]
 
     preds = rf.predict(test.X)
@@ -81,9 +76,14 @@ def train_rf(train, test, dataset_name):
 
     return rf, rmse, idx, X_train_sel, X_test_sel
 
+
+# --------------------------------------------------
+# Nonlinear expansion
+# --------------------------------------------------
+
 def expand(X):
     X = np.asarray(X)
-    X2 = X ** 2
+    X2 = X**2
     n = X.shape[1]
 
     pairs = []
@@ -91,12 +91,9 @@ def expand(X):
         for j in range(i + 1, n):
             pairs.append((X[:, i] * X[:, j])[:, None])
 
-    X_pair = np.hstack(pairs) if pairs else None
-    X_sqrt = np.sqrt(np.abs(X) + 1e-8)
-
-    parts = [X, X2, X_sqrt]
-    if X_pair is not None:
-        parts.append(X_pair)
+    parts = [X, X2]
+    if pairs:
+        parts.append(np.hstack(pairs))
 
     return np.concatenate(parts, axis=1)
 
@@ -125,26 +122,15 @@ def save_prediction_plot(name, rf_preds, sym_preds):
 
 
 # --------------------------------------------------
-# Symbolic training (FIXED)
+# Symbolic training
 # --------------------------------------------------
 
 def train_symbolic(name, rf, idx, X_train_sel, X_test_sel, train, test):
 
-    # dataset-specific cubic strength
-    if name == "ESOL":
-        cubic_k = 10
-    elif name == "FreeSolv":
-        cubic_k = 3
-    else:  # Lipophilicity
-        cubic_k = 8
-
     X_train = expand(X_train_sel)
     X_test = expand(X_test_sel)
 
-
-
-    scaler = StandardScaler(with_mean=True, with_std=True)
-
+    scaler = StandardScaler()
     X_train = scaler.fit_transform(X_train)
     X_test = scaler.transform(X_test)
 
@@ -154,7 +140,8 @@ def train_symbolic(name, rf, idx, X_train_sel, X_test_sel, train, test):
     train_ds = dc.data.NumpyDataset(X_train, y_train)
     test_ds = dc.data.NumpyDataset(X_test, y_test)
 
-    sym = DCTorchSymbolicRegressor(
+    sym = DCTorchSymbolicModel(
+        mode="regression",
         learning_rate=0.001,
         batch_size=128
     )
@@ -163,14 +150,9 @@ def train_symbolic(name, rf, idx, X_train_sel, X_test_sel, train, test):
 
     preds = sym.predict(test_ds).flatten()
 
-    # save plot
     save_prediction_plot(name, y_test, preds)
 
-    # NaN safety
     mask = ~np.isnan(preds)
-    if mask.sum() == 0:
-        return sym, np.nan
-
     preds = preds[mask]
     y_test = y_test[mask]
 
@@ -180,7 +162,7 @@ def train_symbolic(name, rf, idx, X_train_sel, X_test_sel, train, test):
 
 
 # --------------------------------------------------
-# Run dataset (FIXED)
+# Run dataset
 # --------------------------------------------------
 
 def run_dataset(name, loader):
@@ -193,18 +175,16 @@ def run_dataset(name, loader):
         name, rf, idx, X_train_sel, X_test_sel, train, test
     )
 
-    # Save equation
-    try:
-        eq = sym.get_equation()
+    # save equation summary
+    eq = sym.get_equation()
+    os.makedirs("outputs", exist_ok=True)
 
-        with open("outputs/molnet_equations.txt", "a") as f:
-            f.write(f"\n----- {name} -----\n")
-            for k, v in eq.items():
-                if k != "bias" and v is not None:
-                    f.write(f"{k}: {np.mean(np.abs(v)):.4f}\n")
-            f.write(f"bias: {eq['bias']:.4f}\n")
-    except Exception as e:
-        print("Equation save failed:", e)
+    with open("outputs/molnet_equations.txt", "a") as f:
+        f.write(f"\n----- {name} -----\n")
+        for k, v in eq.items():
+            if k != "bias" and v is not None:
+                f.write(f"{k}: {np.mean(np.abs(v)):.4f}\n")
+        f.write(f"bias: {eq['bias']:.4f}\n")
 
     print(f"\n------{name}------")
     print(f"RF RMSE: {rf_rmse:.3f}")
@@ -212,24 +192,6 @@ def run_dataset(name, loader):
     print(f"Gap: {sym_rmse - rf_rmse:.3f}")
 
     return rf_rmse, sym_rmse
-def save_bar_plot(names, rf_vals, sym_vals):
-    os.makedirs("outputs", exist_ok=True)
-
-    x = np.arange(len(names))
-    width = 0.35
-
-    plt.figure(figsize=(6,4))
-    plt.bar(x - width/2, rf_vals, width, label="RandomForest")
-    plt.bar(x + width/2, sym_vals, width, label="Symbolic")
-
-    plt.xticks(x, names)
-    plt.ylabel("RMSE")
-    plt.title("MoleculeNet: RF vs Symbolic")
-    plt.legend()
-
-    plt.tight_layout()
-    plt.savefig("outputs/molnet_bar.png", dpi=150)
-    plt.close()
 
 
 # --------------------------------------------------
@@ -247,19 +209,8 @@ def main():
     print("\n------ FINAL TABLE ---------")
     print("Dataset | RF | Symbolic | Gap")
 
-    rf_vals = []
-    sym_vals = []
-    names = []
-
     for k, (rf, sym) in results.items():
         print(f"{k:12s} {rf:.3f} {sym:.3f} {sym-rf:.3f}")
-        rf_vals.append(rf)
-        sym_vals.append(sym)
-        names.append(k)
-
-    # Save bar plot
-    save_bar_plot(names, rf_vals, sym_vals)
-
 
 
 if __name__ == "__main__":

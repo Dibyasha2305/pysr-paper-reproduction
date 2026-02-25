@@ -11,19 +11,20 @@ from sklearn.ensemble import RandomForestClassifier
 
 from rdkit.Chem import Descriptors
 
-from models.dc_torch_symbolic_regressor import DCTorchSymbolicRegressor
+from models.dc_torch_symbolic_model import DCTorchSymbolicModel
 
-
-# --------------------------------------------------
-# Descriptor names from RDKit
-# --------------------------------------------------
 
 RDKit_NAMES = [d[0] for d in Descriptors.descList]
 
 
 # --------------------------------------------------
-# Save ROC plot
+# Utils
 # --------------------------------------------------
+
+def clean_dataset(ds):
+    mask = ~np.isnan(ds.X).any(axis=1)
+    return dc.data.NumpyDataset(ds.X[mask], ds.y[mask])
+
 
 def save_roc_plot(name, y_true, rf_probs, sym_probs):
     os.makedirs("outputs", exist_ok=True)
@@ -46,13 +47,8 @@ def save_roc_plot(name, y_true, rf_probs, sym_probs):
     plt.close()
 
 
-# --------------------------------------------------
-# Save symbolic equation summary
-# --------------------------------------------------
-
 def save_equation(name, sym):
     eq = sym.get_equation()
-
     os.makedirs("outputs", exist_ok=True)
 
     with open("outputs/molnet_classification_equations.txt", "a") as f:
@@ -64,15 +60,6 @@ def save_equation(name, sym):
 
 
 # --------------------------------------------------
-# Clean NaNs
-# --------------------------------------------------
-
-def clean_dataset(ds):
-    mask = ~np.isnan(ds.X).any(axis=1)
-    return dc.data.NumpyDataset(ds.X[mask], ds.y[mask])
-
-
-# --------------------------------------------------
 # Train models
 # --------------------------------------------------
 
@@ -81,20 +68,15 @@ def train_models(name, train, test):
     train = clean_dataset(train)
     test = clean_dataset(test)
 
-    if len(test.y) == 0:
-        print(f"{name}: no valid samples after cleaning")
-        return np.nan, np.nan
-
-    # ---------------- RF ----------------
     rf = RandomForestClassifier(n_estimators=300, random_state=0)
     rf.fit(train.X, train.y.flatten())
 
     rf_probs = rf.predict_proba(test.X)[:, 1]
-    y_test_rf = test.y.flatten()
+    y_test = test.y.flatten()
 
-    rf_auc = roc_auc_score(y_test_rf, rf_probs)
+    rf_auc = roc_auc_score(y_test, rf_probs)
 
-    # ---------------- Feature selection ----------------
+    # feature selection
     importances = rf.feature_importances_
     top_k = 12 if name == "BBBP" else 10
     idx = np.argsort(importances)[::-1][:top_k]
@@ -102,7 +84,6 @@ def train_models(name, train, test):
     X_train_sel = train.X[:, idx]
     X_test_sel = test.X[:, idx]
 
-    # nonlinear expansion
     X_train_exp = np.concatenate([X_train_sel, X_train_sel**2], axis=1)
     X_test_exp = np.concatenate([X_test_sel, X_test_sel**2], axis=1)
 
@@ -113,14 +94,20 @@ def train_models(name, train, test):
     train_ds = dc.data.NumpyDataset(X_train_exp, train.y.flatten())
     test_ds = dc.data.NumpyDataset(X_test_exp, test.y.flatten())
 
-    sym = DCTorchSymbolicRegressor(
+    sym = DCTorchSymbolicModel(
+        mode="classification",
         learning_rate=0.001,
         batch_size=128
     )
 
     sym.fit(train_ds, nb_epoch=2000)
 
-    # ---------------- Human-readable formula ----------------
+    logits = sym.predict(test_ds).flatten()
+    probs = 1 / (1 + np.exp(-np.clip(logits, -20, 20)))
+
+    sym_auc = roc_auc_score(y_test, probs)
+
+    # human-readable formula
     eq = sym.get_equation()
     linear = eq.get("linear")
     quad = eq.get("quadratic")
@@ -129,7 +116,6 @@ def train_models(name, train, test):
     selected_names = [RDKit_NAMES[i] for i in idx]
 
     terms = []
-
     for w, name_i in zip(linear, selected_names):
         if abs(w) > 0.05:
             sign = "+" if w > 0 else "−"
@@ -145,13 +131,7 @@ def train_models(name, train, test):
     print("\nRecovered symbolic formula:")
     print(formula)
 
-    # ---------------- Predictions ----------------
-    logits = sym.predict(test_ds).flatten()
-    probs = 1 / (1 + np.exp(-np.clip(logits, -20, 20)))
-
-    sym_auc = roc_auc_score(y_test_rf, probs)
-
-    save_roc_plot(name, y_test_rf, rf_probs, probs)
+    save_roc_plot(name, y_test, rf_probs, probs)
     save_equation(name, sym)
 
     print(f"{name} RF AUC: {rf_auc:.3f}")
@@ -168,7 +148,6 @@ def main():
 
     results = {}
 
-    # BBBP
     _, ds, _ = dc.molnet.load_bbbp(
         featurizer=dc.feat.RDKitDescriptors(),
         splitter="scaffold",
@@ -177,7 +156,6 @@ def main():
     train, valid, test = ds
     results["BBBP"] = train_models("BBBP", train, test)
 
-    # BACE
     _, ds, _ = dc.molnet.load_bace_classification(
         featurizer=dc.feat.RDKitDescriptors(),
         splitter="scaffold",
