@@ -1,4 +1,0 @@
-Dataset	       RF RMSE 	 Symbolic RMSE	  Gap
-ESOL	        0.425	    0.552       +0.128
-FreeSolv	0.751	    1.035	+0.284
-Lipophilicity	0.648	    0.538       −0.109
